@@ -1,0 +1,5 @@
+{
+  "name": "MazeArchitect-3D",
+  "description": "An optimized 3D maze generator built with React Three Fiber using Instanced Rendering and custom shaders for multi-face texturing.",
+  "requestFramePermissions": []
+}
