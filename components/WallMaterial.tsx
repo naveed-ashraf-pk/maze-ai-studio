@@ -3,19 +3,14 @@ import React, { useMemo } from 'react';
 import { shaderMaterial } from '@react-three/drei';
 import { extend } from '@react-three/fiber';
 import { Texture, Color } from 'three';
-import { SCALES } from '../utils/constants.ts';
 
-// Create a custom shader material that handles different textures for top, bottom, and sides
 const MultiFaceMaterial = shaderMaterial(
   {
     topMap: null as Texture | null,
     sideMap: null as Texture | null,
     bottomMap: null as Texture | null,
     uColor: new Color(1, 1, 1),
-    uTime: 0,
-    uWallHeight: SCALES.WALL_HEIGHT,
-    uFloorScale: SCALES.FLOOR_TILING,
-    uSideScale: SCALES.WALL_SIDE_TILING
+    uTime: 0
   },
   `
   varying vec2 vUv;
@@ -40,9 +35,6 @@ const MultiFaceMaterial = shaderMaterial(
   uniform sampler2D bottomMap;
   uniform vec3 uColor;
   uniform float uTime;
-  uniform float uWallHeight;
-  uniform float uFloorScale;
-  uniform float uSideScale;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -57,22 +49,20 @@ const MultiFaceMaterial = shaderMaterial(
     if (isTop) {
       texColor = texture2D(topMap, vUv);
     } else if (isBottom) {
-      // Scale bottom face to match world-space floor
-      texColor = texture2D(bottomMap, vUv * (1.0 / uFloorScale));
+      texColor = texture2D(bottomMap, vUv);
     } else {
-      // Scale sides to maintain texture aspect ratio regardless of wall height
-      vec2 sideUv = vec2(vUv.x * (1.0 / uSideScale), vUv.y * (uWallHeight / uSideScale));
-      texColor = texture2D(sideMap, sideUv);
+      // For sides of a 1x1x1 cube, standard UVs work perfectly
+      texColor = texture2D(sideMap, vUv);
     }
 
     vec3 lightDir = normalize(vec3(0.5, 1.0, 0.4));
     float diff = max(dot(vNormal, lightDir), 0.0);
-    float ambient = 0.4;
+    float ambient = 0.5;
     
     vec3 finalColor = texColor.rgb * (diff + ambient) * uColor;
     
-    // Low-cost atmospheric detail/shimmer
-    float pulse = sin(uTime * 0.4 + vWorldPosition.x * 0.2 + vWorldPosition.z * 0.2) * 0.008;
+    // Low-cost atmospheric detail
+    float pulse = sin(uTime * 0.4 + vWorldPosition.x * 0.2 + vWorldPosition.z * 0.2) * 0.005;
     finalColor += pulse;
 
     gl_FragColor = vec4(finalColor, 1.0);
@@ -80,11 +70,7 @@ const MultiFaceMaterial = shaderMaterial(
   `
 );
 
-// We extend the Three namespace to include our custom material
 extend({ MultiFaceMaterial });
-
-// FIX: Removed the global JSX namespace override that was causing all standard elements (div, mesh, etc.) 
-// to appear as non-existent because it was replacing the entire IntrinsicElements interface.
 
 interface WallMaterialProps {
   topMap: Texture;
@@ -94,11 +80,8 @@ interface WallMaterialProps {
 }
 
 const WallMaterial: React.FC<WallMaterialProps> = ({ topMap, sideMap, bottomMap, uTime = 0 }) => {
-  // Use useMemo to ensure the material instance is stable across re-renders
   const material = useMemo(() => new MultiFaceMaterial(), []);
 
-  // Use <primitive /> to inject the custom material into the Three.js scene graph.
-  // This avoids the need for complex global JSX type declarations while remaining fully type-safe.
   return (
     <primitive 
       object={material}

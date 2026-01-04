@@ -4,12 +4,14 @@ import { useLoader } from '@react-three/fiber';
 import { TextureLoader, RepeatWrapping } from 'three';
 import Maze from './Maze.tsx';
 import Chest from './Chest.tsx';
+import Player from './Player.tsx';
 import { SPAWN, GOAL, PATH, WALL, CHEST } from '../utils/maze.ts';
 import { TEXTURES, SCALES, COLORS, MAZE_CONFIG } from '../utils/constants.ts';
 
 interface SceneProps {
   mazeData: string[][];
   showLights: boolean;
+  onPlayerMove: (pos: { x: number, z: number }) => void;
 }
 
 interface FloorProps {
@@ -109,12 +111,15 @@ const WallMountedLights: React.FC<{ data: string[][], showLights: boolean }> = (
   );
 };
 
-const Scene: React.FC<SceneProps> = ({ mazeData, showLights }) => {
+const Scene: React.FC<SceneProps> = ({ mazeData, showLights, onPlayerMove }) => {
   return (
     <group>
       <Floor width={mazeData.length} height={mazeData[0].length} showLights={showLights} />
       <Maze data={mazeData} size={mazeData.length} />
       <WallMountedLights data={mazeData} showLights={showLights} />
+      
+      <Player mazeData={mazeData} onPositionUpdate={onPlayerMove} />
+
       {mazeData.map((row, x) => 
         row.map((cell, z) => {
           if (cell === SPAWN) {
@@ -122,7 +127,7 @@ const Scene: React.FC<SceneProps> = ({ mazeData, showLights }) => {
               <group key={`spawn-${x}-${z}`} position={[x + 0.5, 0, z + 0.5]}>
                 <mesh position={[0, 0.05, 0]}>
                   <cylinderGeometry args={[0.6, 0.6, 0.1, 16]} />
-                  <meshBasicMaterial color={COLORS.SPAWN} />
+                  <meshBasicMaterial color={COLORS.SPAWN} transparent opacity={0.2} />
                 </mesh>
               </group>
             );

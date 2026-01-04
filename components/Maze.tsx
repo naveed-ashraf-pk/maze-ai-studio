@@ -12,7 +12,7 @@ interface MazeProps {
 }
 
 interface MazeChunkProps { 
-  chunkData: {x: number, z: number}[], 
+  chunkData: {x: number, y: number, z: number}[], 
   sideTex: any,
   topTex: any,
   floorTex: any
@@ -30,7 +30,7 @@ const MazeChunk: React.FC<MazeChunkProps> = ({
   useLayoutEffect(() => {
     if (!meshRef.current) return;
     chunkData.forEach((pos, i) => {
-      dummy.position.set(pos.x + 0.5, SCALES.WALL_HEIGHT / 2, pos.z + 0.5);
+      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
       dummy.updateMatrix();
       meshRef.current!.setMatrixAt(i, dummy.matrix);
     });
@@ -43,7 +43,7 @@ const MazeChunk: React.FC<MazeChunkProps> = ({
       ref={meshRef}
       args={[undefined, undefined, chunkData.length]}
     >
-      <boxGeometry args={[1, SCALES.WALL_HEIGHT, 1]} />
+      <boxGeometry args={[1, 1, 1]} />
       <WallMaterial 
         topMap={topTex} 
         sideMap={sideTex} 
@@ -68,8 +68,9 @@ const Maze: React.FC<MazeProps> = ({ data }) => {
   }, [sideTex, topTex, floorTex]);
 
   const chunks = useMemo(() => {
-    const map = new Map<string, {x: number, z: number}[]>();
+    const map = new Map<string, {x: number, y: number, z: number}[]>();
     const chunkSize = MAZE_CONFIG.CHUNK_SIZE;
+    const wallHeight = Math.round(SCALES.WALL_HEIGHT);
 
     for (let x = 0; x < data.length; x++) {
       for (let z = 0; z < data[0].length; z++) {
@@ -78,7 +79,11 @@ const Maze: React.FC<MazeProps> = ({ data }) => {
           const cz = Math.floor(z / chunkSize);
           const key = `${cx},${cz}`;
           if (!map.has(key)) map.set(key, []);
-          map.get(key)!.push({ x, z });
+          
+          // Stack individual 1x1x1 cubes
+          for (let y = 0; y < wallHeight; y++) {
+            map.get(key)!.push({ x, y, z });
+          }
         }
       }
     }
