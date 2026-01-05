@@ -1,0 +1,191 @@
+
+/* --- SOUL-TECH THEME VARIABLES --- */
+:root {
+  --void-black: #000508;
+  --obsidian: #050a0f;
+  --mana-cyan: #00f2ff;
+  --mana-glow: rgba(0, 242, 255, 0.5);
+  --soul-purple: #7000ff;
+  --bone-white: #e0f7fa;
+  --glass: rgba(0, 15, 20, 0.8);
+  --font-ancient: 'Cinzel', serif;
+  --font-tech: 'Space Grotesk', sans-serif;
+  --transition-smooth: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes sonar-pulse {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { opacity: 0.5; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* --- BASE STYLES --- */
+body {
+  margin: 0;
+  background-color: var(--void-black);
+  color: var(--bone-white);
+  font-family: var(--font-tech);
+  overflow: hidden;
+  user-select: none;
+}
+
+h1, h2, h3, .ancient-text {
+  font-family: var(--font-ancient);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+/* --- THE ARTIFACT SYSTEM (MODALS/PANELS) --- */
+.artifact-container {
+  background: var(--glass);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(0, 242, 255, 0.15);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 242, 255, 0.02);
+  clip-path: polygon(
+    0 10px, 10px 0, 
+    calc(100% - 10px) 0, 100% 10px, 
+    100% calc(100% - 10px), calc(100% - 10px) 100%, 
+    10px 100%, 0 calc(100% - 10px)
+  );
+  position: relative;
+}
+
+.artifact-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg, transparent 45%, rgba(0, 242, 255, 0.05) 50%, transparent 55%);
+  background-size: 200% 200%;
+  animation: shine 8s infinite linear;
+  pointer-events: none;
+}
+
+@keyframes shine {
+  0% { background-position: -200% -200%; }
+  100% { background-position: 200% 200%; }
+}
+
+/* --- RUNIC BUTTONS --- */
+.runic-btn {
+  background: rgba(0, 242, 255, 0.03);
+  border: 1px solid rgba(0, 242, 255, 0.1);
+  color: var(--mana-cyan);
+  padding: 12px 24px;
+  font-family: var(--font-ancient);
+  font-weight: 900;
+  font-size: 0.8rem;
+  letter-spacing: 0.3em;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.runic-btn:hover {
+  background: rgba(0, 242, 255, 0.1);
+  border-color: var(--mana-cyan);
+  text-shadow: 0 0 10px var(--mana-cyan);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 25px rgba(0, 242, 255, 0.2);
+}
+
+.runic-btn:active {
+  transform: translateY(1px);
+}
+
+/* --- HOLOGRAPHIC MINIMAP --- */
+.hologram-map {
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(0, 242, 255, 0.08) 0%, transparent 75%);
+  border-radius: 50%;
+  border: 1px solid rgba(0, 242, 255, 0.2);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.05);
+}
+
+@media (min-width: 640px) {
+  .hologram-map {
+    width: 180px;
+    height: 180px;
+  }
+}
+
+.hologram-map::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 242, 255, 0.1);
+  animation: spin 30s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* --- HUD OVERLAYS --- */
+.chromatic-aberration {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  mix-blend-mode: screen;
+  opacity: 0.03; /* Significantly reduced from 0.15 */
+  background: radial-gradient(circle, transparent 50%, #f0f 100%),
+              radial-gradient(circle, transparent 50%, #0ff 100%);
+  background-size: 100% 100%, 102% 102%;
+}
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.5) 50%);
+  background-size: 100% 4px;
+  opacity: 0.02; /* Significantly reduced from 0.25 */
+}
+
+/* --- CUSTOM RANGE INPUT --- */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  background: rgba(0, 242, 255, 0.1);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--mana-cyan);
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--mana-cyan);
+}
+
+/* --- CUSTOM SCROLLBAR --- */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--mana-cyan); box-shadow: 0 0 10px var(--mana-cyan); }

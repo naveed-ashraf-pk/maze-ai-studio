@@ -5,8 +5,9 @@ import App from './App';
 import { ThreeElements } from '@react-three/fiber';
 
 // Fix for "Property does not exist on type 'JSX.IntrinsicElements'" errors.
-// This correctly extends the global JSX namespace with Three.js elements from @react-three/fiber.
-// Using 'interface' instead of 'type' ensures we merge with existing IntrinsicElements rather than overwriting them.
+// Using 'declare global' is the standard way to augment the JSX namespace for 
+// React Three Fiber elements globally, ensuring standard tags are recognized 
+// in all project files without local redeclarations.
 declare global {
   namespace JSX {
     interface IntrinsicElements extends ThreeElements {}

@@ -1,9 +1,18 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, ThreeElements } from '@react-three/fiber';
 import { Vector3, Group, Mesh } from 'three';
-import { SPAWN } from '../utils/maze.ts';
-import { COLORS } from '../utils/constants.ts';
+// Fixed: Removed .ts extension from utility imports
+import { SPAWN } from '../utils/maze';
+import { COLORS } from '../utils/constants';
+
+// Fix for "Property does not exist on type 'JSX.IntrinsicElements'" errors.
+// Augmenting JSX namespace locally to support React Three Fiber tags.
+declare global {
+  namespace JSX {
+    interface IntrinsicElements extends ThreeElements {}
+  }
+}
 
 interface PlayerProps {
   mazeData: string[][];

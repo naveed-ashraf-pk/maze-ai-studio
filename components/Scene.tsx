@@ -1,12 +1,20 @@
 
 import React, { useMemo } from 'react';
-import { useLoader } from '@react-three/fiber';
+import { useLoader, ThreeElements } from '@react-three/fiber';
 import { TextureLoader, RepeatWrapping } from 'three';
-import Maze from './Maze.tsx';
-import Chest from './Chest.tsx';
-import Player from './Player.tsx';
-import { SPAWN, GOAL, PATH, WALL, CHEST } from '../utils/maze.ts';
-import { TEXTURES, SCALES, COLORS, MAZE_CONFIG } from '../utils/constants.ts';
+import Maze from './Maze';
+import Chest from './Chest';
+import Player from './Player';
+import { SPAWN, GOAL, PATH, WALL, CHEST } from '../utils/maze';
+import { TEXTURES, SCALES, COLORS, MAZE_CONFIG } from '../utils/constants';
+
+// Fix for "Property does not exist on type 'JSX.IntrinsicElements'" errors.
+// Augmenting JSX namespace locally to ensure all R3F lowercase tags are typed correctly.
+declare global {
+  namespace JSX {
+    interface IntrinsicElements extends ThreeElements {}
+  }
+}
 
 interface SceneProps {
   mazeData: string[][];
@@ -14,13 +22,7 @@ interface SceneProps {
   onPlayerMove: (pos: { x: number, z: number }) => void;
 }
 
-interface FloorProps {
-  width: number;
-  height: number;
-  showLights: boolean;
-}
-
-const Floor: React.FC<FloorProps> = ({ width, height, showLights }) => {
+const Floor = React.memo(({ width, height, showLights }: { width: number, height: number, showLights: boolean }) => {
   const floorTex = useLoader(TextureLoader, TEXTURES.FLOOR);
   const planeWidth = width + 100;
   const planeHeight = height + 100;
@@ -43,9 +45,9 @@ const Floor: React.FC<FloorProps> = ({ width, height, showLights }) => {
       )}
     </mesh>
   );
-};
+});
 
-const Torch: React.FC<{ position: [number, number, number], rotation: [number, number, number], showLights: boolean }> = ({ position, rotation, showLights }) => {
+const Torch = React.memo(({ position, rotation, showLights }: { position: [number, number, number], rotation: [number, number, number], showLights: boolean }) => {
   return (
     <group position={position} rotation={rotation}>
       <mesh position={[0, 0, 0.05]}>
@@ -62,14 +64,19 @@ const Torch: React.FC<{ position: [number, number, number], rotation: [number, n
           <meshBasicMaterial color={COLORS.CORRIDOR_LIGHT} />
         </mesh>
         {showLights && (
-          <pointLight color={COLORS.CORRIDOR_LIGHT} intensity={12} distance={COLORS.LIGHT_DISTANCE} decay={COLORS.LIGHT_DECAY} />
+          <pointLight 
+            color={COLORS.CORRIDOR_LIGHT} 
+            intensity={12} 
+            distance={COLORS.LIGHT_DISTANCE} 
+            decay={COLORS.LIGHT_DECAY} 
+          />
         )}
       </group>
     </group>
   );
-};
+});
 
-const WallMountedLights: React.FC<{ data: string[][], showLights: boolean }> = ({ data, showLights }) => {
+const WallMountedLights = React.memo(({ data, showLights }: { data: string[][], showLights: boolean }) => {
   const torches = useMemo(() => {
     const list: { pos: [number, number, number], rot: [number, number, number] }[] = [];
     const w = data.length;
@@ -109,9 +116,55 @@ const WallMountedLights: React.FC<{ data: string[][], showLights: boolean }> = (
       ))}
     </group>
   );
-};
+});
 
-const Scene: React.FC<SceneProps> = ({ mazeData, showLights, onPlayerMove }) => {
+const Scene: React.FC<SceneProps> = React.memo(({ mazeData, showLights, onPlayerMove }) => {
+  // CRITICAL PERFORMANCE: Memoize the entities to avoid O(N^2) array mapping during player movement re-renders
+  const staticEntities = useMemo(() => {
+    const list: React.ReactNode[] = [];
+    mazeData.forEach((row, x) => {
+      row.forEach((cell, z) => {
+        if (cell === SPAWN) {
+          list.push(
+            <group key={`spawn-${x}-${z}`} position={[x + 0.5, 0, z + 0.5]}>
+              <mesh position={[0, 0.05, 0]}>
+                <cylinderGeometry args={[0.6, 0.6, 0.1, 16]} />
+                <meshBasicMaterial color={COLORS.SPAWN} transparent opacity={0.2} />
+              </mesh>
+            </group>
+          );
+        } else if (cell === GOAL) {
+          list.push(
+            <group key={`goal-${x}-${z}`} position={[x + 0.5, 0.8, z + 0.5]}>
+              <mesh><torusKnotGeometry args={[0.3, 0.1, 32, 4]} /><meshBasicMaterial color={COLORS.GOAL} /></mesh>
+            </group>
+          );
+        } else if (cell === CHEST) {
+          list.push(
+            <group key={`chest-${x}-${z}`} position={[x + 0.5, 0, z + 0.5]}>
+              <Chest showLights={showLights} />
+            </group>
+          );
+        }
+      });
+    });
+    return list;
+  }, [mazeData, showLights]);
+
+  // Goal light is separated to allow for dynamic lighting logic without recalculating positions
+  const goalLights = useMemo(() => {
+    if (!showLights) return null;
+    const list: React.ReactNode[] = [];
+    mazeData.forEach((row, x) => {
+      row.forEach((cell, z) => {
+        if (cell === GOAL) {
+          list.push(<pointLight key={`goal-light-${x}-${z}`} position={[x + 0.5, 0.8, z + 0.5]} color={COLORS.GOAL} intensity={15} distance={10} />);
+        }
+      });
+    });
+    return list;
+  }, [mazeData, showLights]);
+
   return (
     <group>
       <Floor width={mazeData.length} height={mazeData[0].length} showLights={showLights} />
@@ -120,38 +173,10 @@ const Scene: React.FC<SceneProps> = ({ mazeData, showLights, onPlayerMove }) => 
       
       <Player mazeData={mazeData} onPositionUpdate={onPlayerMove} />
 
-      {mazeData.map((row, x) => 
-        row.map((cell, z) => {
-          if (cell === SPAWN) {
-            return (
-              <group key={`spawn-${x}-${z}`} position={[x + 0.5, 0, z + 0.5]}>
-                <mesh position={[0, 0.05, 0]}>
-                  <cylinderGeometry args={[0.6, 0.6, 0.1, 16]} />
-                  <meshBasicMaterial color={COLORS.SPAWN} transparent opacity={0.2} />
-                </mesh>
-              </group>
-            );
-          }
-          if (cell === GOAL) {
-            return (
-              <group key={`goal-${x}-${z}`} position={[x + 0.5, 0.8, z + 0.5]}>
-                <mesh><torusKnotGeometry args={[0.3, 0.1, 32, 4]} /><meshBasicMaterial color={COLORS.GOAL} /></mesh>
-                {showLights && <pointLight color={COLORS.GOAL} intensity={15} distance={10} />}
-              </group>
-            );
-          }
-          if (cell === CHEST) {
-            return (
-              <group key={`chest-${x}-${z}`} position={[x + 0.5, 0, z + 0.5]}>
-                <Chest showLights={showLights} />
-              </group>
-            );
-          }
-          return null;
-        })
-      )}
+      {staticEntities}
+      {goalLights}
     </group>
   );
-};
+});
 
 export default Scene;

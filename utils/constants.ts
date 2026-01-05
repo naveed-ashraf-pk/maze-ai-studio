@@ -1,6 +1,6 @@
 
 /**
- * Global Configuration for DungeonArchitect
+ * Global Configuration for The Spectral Necropolis
  */
 export const TEXTURES = {
   // Floor (Ancient Stone Carvings)
@@ -12,24 +12,27 @@ export const TEXTURES = {
 };
 
 export const SCALES = {
-  FLOOR_TILING: 4.0, 
-  WALL_SIDE_TILING: 2.0, 
-  WALL_HEIGHT: 2.0,
+  FLOOR_TILING: 6.0, 
+  WALL_SIDE_TILING: 3.0, 
+  WALL_HEIGHT: 3.0, // Taller walls for more claustrophobia
 };
 
+// Added missing light properties LIGHT_DISTANCE and LIGHT_DECAY to resolve errors in Scene.tsx
 export const COLORS = {
-  SPAWN: '#00ffcc',
-  GOAL: '#ff0088',
-  CORRIDOR_LIGHT: '#EFC070', 
-  TORCH_BRACKET: '#1a1a1a',  
-  AMBIENT_INTENSITY: 0.1,    
-  SUN_INTENSITY: 0.0,        
-  LIGHT_DISTANCE: 10.0,      
-  LIGHT_DECAY: 2.5,          
+  SPAWN: '#00f2ff', 
+  GOAL: '#ffffff',  
+  CORRIDOR_LIGHT: '#00ccff', 
+  TORCH_BRACKET: '#020508',  
+  AMBIENT_INTENSITY: 0.01,   
+  VOID_FOG: '#000508',
+  MANA: '#00f2ff',
+  SOUL: '#7000ff',
+  LIGHT_DISTANCE: 10,
+  LIGHT_DECAY: 2,
 };
 
 export const MAZE_CONFIG = {
-  CHUNK_SIZE: 15,            
-  LIGHT_SPACING: 35,         // Increased from 20 to 35 to reduce light count further
-  ANISOTROPY: 2,             
+  CHUNK_SIZE: 12,            
+  LIGHT_SPACING: 15,         
+  ANISOTROPY: 16,             
 };

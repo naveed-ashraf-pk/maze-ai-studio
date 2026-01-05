@@ -1,10 +1,18 @@
 
 import React, { useRef, useLayoutEffect, useMemo } from 'react';
 import { InstancedMesh, Object3D, TextureLoader, RepeatWrapping } from 'three';
-import { useLoader } from '@react-three/fiber';
-import WallMaterial from './WallMaterial.tsx';
-import { WALL } from '../utils/maze.ts';
-import { TEXTURES, SCALES, MAZE_CONFIG } from '../utils/constants.ts';
+import { useLoader, ThreeElements } from '@react-three/fiber';
+import WallMaterial from './WallMaterial';
+import { WALL } from '../utils/maze';
+import { TEXTURES, SCALES, MAZE_CONFIG } from '../utils/constants';
+
+// Fix for "Property does not exist on type 'JSX.IntrinsicElements'" errors.
+// Augmenting JSX namespace to include React Three Fiber elements in this module.
+declare global {
+  namespace JSX {
+    interface IntrinsicElements extends ThreeElements {}
+  }
+}
 
 interface MazeProps {
   data: string[][];
@@ -18,12 +26,12 @@ interface MazeChunkProps {
   floorTex: any
 }
 
-const MazeChunk: React.FC<MazeChunkProps> = ({ 
+const MazeChunk = React.memo(({ 
   chunkData, 
   sideTex, 
   topTex, 
   floorTex 
-}) => {
+}: MazeChunkProps) => {
   const meshRef = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
 
@@ -42,6 +50,7 @@ const MazeChunk: React.FC<MazeChunkProps> = ({
     <instancedMesh
       ref={meshRef}
       args={[undefined, undefined, chunkData.length]}
+      frustumCulled={true}
     >
       <boxGeometry args={[1, 1, 1]} />
       <WallMaterial 
@@ -51,9 +60,9 @@ const MazeChunk: React.FC<MazeChunkProps> = ({
       />
     </instancedMesh>
   );
-};
+});
 
-const Maze: React.FC<MazeProps> = ({ data }) => {
+const Maze: React.FC<MazeProps> = React.memo(({ data }) => {
   const [sideTex, topTex, floorTex] = useLoader(TextureLoader, [
     TEXTURES.WALL_SIDE,
     TEXTURES.WALL_TOP,
@@ -80,7 +89,6 @@ const Maze: React.FC<MazeProps> = ({ data }) => {
           const key = `${cx},${cz}`;
           if (!map.has(key)) map.set(key, []);
           
-          // Stack individual 1x1x1 cubes
           for (let y = 0; y < wallHeight; y++) {
             map.get(key)!.push({ x, y, z });
           }
@@ -103,6 +111,6 @@ const Maze: React.FC<MazeProps> = ({ data }) => {
       ))}
     </group>
   );
-};
+});
 
 export default Maze;
