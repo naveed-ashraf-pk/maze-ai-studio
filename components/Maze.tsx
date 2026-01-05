@@ -1,13 +1,12 @@
 
 import React, { useRef, useLayoutEffect, useMemo } from 'react';
-import { InstancedMesh, Object3D, TextureLoader, RepeatWrapping } from 'three';
-import { useLoader, ThreeElements } from '@react-three/fiber';
+import { InstancedMesh, Object3D } from 'three';
+import { ThreeElements } from '@react-three/fiber';
 import WallMaterial from './WallMaterial';
 import { WALL } from '../utils/maze';
-import { TEXTURES, SCALES, MAZE_CONFIG } from '../utils/constants';
+import { SCALES, MAZE_CONFIG } from '../utils/constants';
+import { getWallSideTexture, getWallTopTexture, getFloorTexture } from '../assets/textures';
 
-// Fix for "Property does not exist on type 'JSX.IntrinsicElements'" errors.
-// Augmenting JSX namespace to include React Three Fiber elements in this module.
 declare global {
   namespace JSX {
     interface IntrinsicElements extends ThreeElements {}
@@ -57,24 +56,22 @@ const MazeChunk = React.memo(({
         topMap={topTex} 
         sideMap={sideTex} 
         bottomMap={floorTex} 
+        glowColor="#990000"          // Deep arterial red
+        glowSecondaryColor="#ff9900" // Bright energetic orange
+        pulseSpeed={0.4}             // Steady, organic breathing speed
+        pulseRange={0.8}             // Keep it slightly more biased towards red
+        glowIntensity={1.2}          // Slight boost for visual impact
       />
     </instancedMesh>
   );
 });
 
 const Maze: React.FC<MazeProps> = React.memo(({ data }) => {
-  const [sideTex, topTex, floorTex] = useLoader(TextureLoader, [
-    TEXTURES.WALL_SIDE,
-    TEXTURES.WALL_TOP,
-    TEXTURES.FLOOR
-  ]);
-
-  useMemo(() => {
-    [sideTex, topTex, floorTex].forEach(t => {
-      t.wrapS = t.wrapT = RepeatWrapping;
-      t.anisotropy = MAZE_CONFIG.ANISOTROPY;
-    });
-  }, [sideTex, topTex, floorTex]);
+  const [sideTex, topTex, floorTex] = useMemo(() => [
+    getWallSideTexture(),
+    getWallTopTexture(),
+    getFloorTexture()
+  ], []);
 
   const chunks = useMemo(() => {
     const map = new Map<string, {x: number, y: number, z: number}[]>();

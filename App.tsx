@@ -28,7 +28,7 @@ const CameraRotationSync = ({ onChange, target }: { onChange: (rotation: number)
 };
 
 const App: React.FC = () => {
-  const [mazeSize, setMazeSize] = useState(25); // Smaller default for better mobile performance
+  const [mazeSize, setMazeSize] = useState(25); 
   const [seed, setSeed] = useState(0);
   const [showLights, setShowLights] = useState(true); 
   const [cameraRot, setCameraRot] = useState(0);
@@ -69,11 +69,11 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full h-full relative bg-[#01080b] overflow-hidden select-none">
+    <div className="w-full h-full relative bg-[#010203] overflow-hidden select-none">
       <div className={`w-full h-full transition-all duration-1000 ${isPaused || showInventory ? 'blur-xl opacity-40' : 'blur-0 opacity-100'}`}>
         <Canvas 
           shadows={false} 
-          dpr={[1, 2]} // High res for modern mobile displays
+          dpr={[1, 2]} 
           gl={{ 
             antialias: true,
             powerPreference: "high-performance",
@@ -90,15 +90,15 @@ const App: React.FC = () => {
               target={[playerPos.x, 0.5, playerPos.z]}
               enablePan={false}
               maxPolarAngle={Math.PI / 2.2}
-              minDistance={4}
-              maxDistance={15}
+              minDistance={3}
+              maxDistance={18}
               makeDefault
             />
 
-            <ambientLight intensity={showLights ? 0.1 : 0.6} color="#002233" />
+            <ambientLight intensity={showLights ? 0.05 : 0.4} color="#001122" />
             
             <color attach="background" args={[COLORS.VOID_FOG]} />
-            <fog attach="fog" args={[COLORS.VOID_FOG, 3, 25]} />
+            <fog attach="fog" args={[COLORS.VOID_FOG, 2, 22]} />
 
             <Scene 
               mazeData={mazeData}
@@ -109,10 +109,8 @@ const App: React.FC = () => {
         </Canvas>
       </div>
 
-      {/* Screen Effects */}
-      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_rgba(0,0,0,1)] z-10" />
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_200px_rgba(0,0,0,1)] z-10" />
 
-      {/* HUD & Overlays */}
       <HUDManager 
         isPaused={isPaused} 
         setIsPaused={setIsPaused}
@@ -125,12 +123,10 @@ const App: React.FC = () => {
         regenerate={regenerate}
       />
 
-      {/* MINI MAP: Responsive Positioning at bottom-left, away from action buttons on bottom-right */}
       <div className="absolute bottom-4 left-4 sm:bottom-10 sm:left-10 z-20 transition-transform duration-500 hover:scale-105 origin-bottom-left">
         <MiniMap mazeData={mazeData} rotation={cameraRot} playerPos={playerPos} />
       </div>
       
-      {/* PERFORMANCE STATS: Minimalist for Mobile */}
       <div className="absolute top-2 right-2 opacity-5 hover:opacity-100 transition-opacity z-50 scale-[0.6] origin-top-right invert">
         <Stats />
       </div>

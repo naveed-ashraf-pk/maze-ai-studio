@@ -1,15 +1,14 @@
 
 import React, { useMemo } from 'react';
-import { useLoader, ThreeElements } from '@react-three/fiber';
-import { TextureLoader, RepeatWrapping } from 'three';
+import { ThreeElements } from '@react-three/fiber';
 import Maze from './Maze';
 import Chest from './Chest';
 import Player from './Player';
 import { SPAWN, GOAL, PATH, WALL, CHEST } from '../utils/maze';
-import { TEXTURES, SCALES, COLORS, MAZE_CONFIG } from '../utils/constants';
+import { SCALES, COLORS, MAZE_CONFIG } from '../utils/constants';
+import { getFloorTexture } from '../assets/textures';
 
 // Fix for "Property does not exist on type 'JSX.IntrinsicElements'" errors.
-// Augmenting JSX namespace locally to ensure all R3F lowercase tags are typed correctly.
 declare global {
   namespace JSX {
     interface IntrinsicElements extends ThreeElements {}
@@ -23,17 +22,16 @@ interface SceneProps {
 }
 
 const Floor = React.memo(({ width, height, showLights }: { width: number, height: number, showLights: boolean }) => {
-  const floorTex = useLoader(TextureLoader, TEXTURES.FLOOR);
+  const floorTex = useMemo(() => {
+    const tex = getFloorTexture();
+    const planeWidth = width + 100;
+    const planeHeight = height + 100;
+    tex.repeat.set(planeWidth / SCALES.FLOOR_TILING, planeHeight / SCALES.FLOOR_TILING);
+    return tex;
+  }, [width, height]);
+
   const planeWidth = width + 100;
   const planeHeight = height + 100;
-  
-  useMemo(() => {
-    if (floorTex) {
-      floorTex.wrapS = floorTex.wrapT = RepeatWrapping;
-      floorTex.repeat.set(planeWidth / SCALES.FLOOR_TILING, planeHeight / SCALES.FLOOR_TILING);
-      floorTex.anisotropy = MAZE_CONFIG.ANISOTROPY;
-    }
-  }, [floorTex, planeWidth, planeHeight]);
 
   return (
     <mesh rotation-x={-Math.PI / 2} position={[width / 2, -0.01, height / 2]}>
@@ -119,7 +117,6 @@ const WallMountedLights = React.memo(({ data, showLights }: { data: string[][], 
 });
 
 const Scene: React.FC<SceneProps> = React.memo(({ mazeData, showLights, onPlayerMove }) => {
-  // CRITICAL PERFORMANCE: Memoize the entities to avoid O(N^2) array mapping during player movement re-renders
   const staticEntities = useMemo(() => {
     const list: React.ReactNode[] = [];
     mazeData.forEach((row, x) => {
@@ -151,7 +148,6 @@ const Scene: React.FC<SceneProps> = React.memo(({ mazeData, showLights, onPlayer
     return list;
   }, [mazeData, showLights]);
 
-  // Goal light is separated to allow for dynamic lighting logic without recalculating positions
   const goalLights = useMemo(() => {
     if (!showLights) return null;
     const list: React.ReactNode[] = [];
