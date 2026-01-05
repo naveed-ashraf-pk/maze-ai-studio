@@ -56,11 +56,11 @@ const MazeChunk = React.memo(({
         topMap={topTex} 
         sideMap={sideTex} 
         bottomMap={floorTex} 
-        glowColor="#990000"          // Deep arterial red
-        glowSecondaryColor="#ff9900" // Bright energetic orange
-        pulseSpeed={0.4}             // Steady, organic breathing speed
-        pulseRange={0.8}             // Keep it slightly more biased towards red
-        glowIntensity={1.2}          // Slight boost for visual impact
+        glowColor="#990000"          
+        glowSecondaryColor="#ff9900" 
+        pulseSpeed={0.4}             
+        pulseRange={0.8}             
+        glowIntensity={1.2}          
       />
     </instancedMesh>
   );

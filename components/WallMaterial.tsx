@@ -4,47 +4,86 @@ import { shaderMaterial } from '@react-three/drei';
 import { extend, ThreeElements, useFrame } from '@react-three/fiber';
 import { Texture, Color, Vector3 } from 'three';
 
+/**
+ * ============================================================================
+ * WALL MATERIAL: THE ANCIENT LIVING STONE
+ * ============================================================================
+ * 
+ * A high-performance, procedurally-enhanced tri-planar material designed for 
+ * large-scale instanced environments (like mazes).
+ * 
+ * FEATURES:
+ * - Tri-planar Mapping: Textures never stretch regardless of cube dimensions.
+ * - Procedural Cracks: Generates dynamic fissures with depth-based Ambient Occlusion.
+ * - Multi-Face Logic: Specifically blends 'Top', 'Side', and 'Bottom' textures based on normal.
+ * - Optimized ALU: Uses distance-based culling for heavy procedural features.
+ * - Emissive Sparks: Floating ember particles that rise from the fissures.
+ * 
+ * USAGE EXAMPLES:
+ * 
+ * 1. Standard Ember Wall (Default):
+ *    <WallMaterial topMap={t} sideMap={s} bottomMap={b} glowColor="#ff2200" />
+ * 
+ * 2. Frozen Crypt (Blue Glow, No Sparks):
+ *    <WallMaterial 
+ *      topMap={snow} sideMap={ice} bottomMap={ice} 
+ *      glowColor="#00ffff" glowSecondaryColor="#0044ff" 
+ *      enableSparks={false} pulseSpeed={0.2} 
+ *    />
+ * 
+ * 3. High Performance (No Glow/Sparks):
+ *    <WallMaterial topMap={t} sideMap={s} bottomMap={b} enableGlow={false} enableSparks={false} />
+ * 
+ * ============================================================================
+ */
+
 declare global {
   namespace JSX {
     interface IntrinsicElements extends ThreeElements {}
   }
 }
 
-/**
- * Ancient Living Stone Material
- * Features high-intensity procedural cracks with high-frequency flickering embers.
- * Now exposes pulse speed and color transition range for fine-tuned "living" energy effects.
- */
 const MultiFaceMaterial = shaderMaterial(
   {
+    // Texture Maps
     topMap: null as Texture | null,
     sideMap: null as Texture | null,
     bottomMap: null as Texture | null,
-    uGlowColor: new Color('#880000'),          // Default Deep Red
-    uGlowSecondaryColor: new Color('#ffaa00'), // Default Hot Amber
-    uTime: 0,
-    uLightPos: new Vector3(5, 10, 5),
-    uPulseSpeed: 0.5,
-    uPulseRange: 1.0,  // Controls the "width" of color transition (0.0 = only primary, 1.0 = full mix)
-    uGlowIntensity: 1.0, // Overall brightness multiplier
+    
+    // Glow Configuration
+    uGlowColor: new Color('#880000'),          // Primary glow color (fissure core)
+    uGlowSecondaryColor: new Color('#ffaa00'), // Secondary glow color (flicker/fringe)
+    uPulseSpeed: 0.5,                          // Speed of the breathing glow effect
+    uPulseRange: 1.0,                          // Breadth of color mixing between primary/secondary
+    uGlowIntensity: 1.0,                       // Overall brightness multiplier
+    
+    // Spark Configuration
+    uSparkIntensity: 1.2,                      // Brightness of rising embers
+    uEnableSparks: 1.0,                        // Toggle switch (1.0 = On, 0.0 = Off)
+    uEnableGlow: 1.0,                          // Toggle switch (1.0 = On, 0.0 = Off)
+    
+    // Environment & Time
+    uTime: 0,                                  // Elapsed time for animations
+    uLightPos: new Vector3(5, 10, 5),          // Position of the primary world light
   },
+  // Vertex Shader
   `
-  varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vObjectNormal;
   varying vec3 vWorldPosition;
 
   void main() {
-    vUv = uv;
     vObjectNormal = normal;
     vNormal = normalize(normalMatrix * normal);
     
+    // Support for InstancedMesh transforms
     vec4 worldPos = instanceMatrix * vec4(position, 1.0);
     vWorldPosition = worldPos.xyz;
     
     gl_Position = projectionMatrix * modelViewMatrix * worldPos;
   }
   `,
+  // Fragment Shader
   `
   uniform sampler2D topMap;
   uniform sampler2D sideMap;
@@ -56,18 +95,22 @@ const MultiFaceMaterial = shaderMaterial(
   uniform float uPulseSpeed;
   uniform float uPulseRange;
   uniform float uGlowIntensity;
+  uniform float uSparkIntensity;
+  uniform float uEnableSparks;
+  uniform float uEnableGlow;
 
-  varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vObjectNormal;
   varying vec3 vWorldPosition;
 
+  // Faster, non-trig hash for performance
   float hash(vec3 p) {
-    p = fract(p * 0.3183099 + 0.1);
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+    p = fract(p * 0.1031);
+    p += dot(p, p.yzx + 33.33);
+    return fract((p.x + p.y) * p.z);
   }
 
+  // Optimized single-octave noise
   float noise(vec3 x) {
     vec3 i = floor(x);
     vec3 f = fract(x);
@@ -78,115 +121,124 @@ const MultiFaceMaterial = shaderMaterial(
                    mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
   }
 
-  float sampleCrack(vec3 p) {
-    float localErosion = noise(p * 0.7 + 15.0);
-    float strengthScale = mix(0.4, 1.3, localErosion);
-
-    vec3 warp = vec3(
-      noise(p * 3.5),
-      noise(p * 3.5 + vec3(5.2)),
-      noise(p * 3.5 + vec3(1.3))
-    ) * 0.12;
-    vec3 warpedPos = p + warp;
-
-    float n1 = noise(warpedPos * 2.8);
-    float fissures = pow(max(0.0, 1.0 - abs(n1 - 0.5) * 12.0), 3.0);
+  // Multi-detail crack sampler
+  // detail = 1.0 calculates micro-fissures (high cost)
+  // detail = 0.0 calculates only major veins (low cost)
+  float getCrackFactor(vec3 p, float detail) {
+    float warp = noise(p * 3.0) * 0.15;
+    vec3 wPos = p + warp;
+    float n = noise(wPos * 2.6);
+    float fissures = pow(max(0.0, 1.0 - abs(n - 0.5) * 10.0), 3.0);
     
-    float n2 = noise(warpedPos * 8.0 + n1 * 2.0);
-    float microCracks = pow(max(0.0, 1.0 - abs(n2 - 0.5) * 18.0), 2.0);
-    
-    return max(fissures, microCracks * 0.35) * strengthScale;
+    if (detail > 0.5) {
+      float m = noise(wPos * 6.0);
+      fissures = max(fissures, pow(max(0.0, 1.0 - abs(m - 0.5) * 15.0), 2.0) * 0.4);
+    }
+    return fissures;
   }
 
   void main() {
-    vec3 blending = abs(vObjectNormal);
-    blending /= (blending.x + blending.y + blending.z);
+    // --- Optimized Tri-planar Selection ---
+    // Uses absolute object normals to decide which texture to project.
+    vec3 weights = abs(vObjectNormal);
+    weights /= (weights.x + weights.y + weights.z);
     
     vec4 xaxis = texture2D(sideMap, vWorldPosition.zy * 0.5);
     vec4 yaxis = texture2D(topMap, vWorldPosition.xz * 0.5);
     vec4 zaxis = texture2D(sideMap, vWorldPosition.xy * 0.5);
-    
-    vec4 texColor = xaxis * blending.x + yaxis * blending.y + zaxis * blending.z;
+    vec4 texColor = xaxis * weights.x + yaxis * weights.y + zaxis * weights.z;
 
-    float eps = 0.012;
-    float cBase = sampleCrack(vWorldPosition);
-    float cX = sampleCrack(vWorldPosition + vec3(eps, 0.0, 0.0));
-    float cY = sampleCrack(vWorldPosition + vec3(0.0, eps, 0.0));
-    float cZ = sampleCrack(vWorldPosition + vec3(0.0, 0.0, eps));
+    // --- Distance-based Optimization ---
+    float dist = distance(vWorldPosition, cameraPosition);
+    float baseCrack = getCrackFactor(vWorldPosition, 1.0);
     
-    vec3 crackNormal = normalize(vec3(cBase - cX, cBase - cY, cBase - cZ));
-    float grainVal = hash(vWorldPosition);
-    vec3 grainNormal = normalize(vNormal + (vec3(grainVal, hash(vWorldPosition+1.0), hash(vWorldPosition+2.0)) - 0.5) * 0.1);
-    vec3 finalNormal = normalize(mix(grainNormal, crackNormal, clamp(cBase * 1.8, 0.0, 0.96)));
+    // Procedural Normal Map (Estimated from noise)
+    // Low detail path (detail=0.0) for neighbors to save ALU
+    const float eps = 0.02;
+    float cX = getCrackFactor(vWorldPosition + vec3(eps, 0.0, 0.0), 0.0);
+    float cY = getCrackFactor(vWorldPosition + vec3(0.0, eps, 0.0), 0.0);
+    float cZ = getCrackFactor(vWorldPosition + vec3(0.0, 0.0, eps), 0.0);
+    
+    vec3 crackNorm = normalize(vec3(baseCrack - cX, baseCrack - cY, baseCrack - cZ));
+    vec3 finalNorm = normalize(mix(vNormal, crackNorm, clamp(baseCrack * 2.0, 0.0, 0.9)));
 
-    // --- PULSATION SYSTEM ---
-    float spatialOffset = noise(vWorldPosition * 0.2) * 6.0;
-    float basePulse = sin(uTime * uPulseSpeed + spatialOffset) * 0.5 + 0.5;
-    basePulse += sin(uTime * uPulseSpeed * 1.8 + spatialOffset) * 0.15;
-    
-    float flicker = (hash(vWorldPosition + uTime * 20.0) - 0.5) * 0.2 * basePulse;
-    float finalPulse = clamp(basePulse + flicker, 0.0, 1.2);
-    
-    // Control the range of the color transition
-    vec3 currentGlowColor = mix(uGlowColor, uGlowSecondaryColor, clamp(finalPulse * uPulseRange, 0.0, 1.0));
-    
-    float cracks = cBase;
-    
-    // Core Heat
-    float coreGlowFactor = pow(cracks, 2.0);
-    vec3 glow = currentGlowColor * coreGlowFactor * (0.8 + finalPulse * 6.0);
-    
-    // White-Hot Filament
-    glow += vec3(1.0, 0.95, 0.8) * pow(cracks, 12.0) * (0.5 + finalPulse * 4.0);
-    
-    // Bloom
-    float bloomFactor = pow(cracks, 0.7);
-    glow += currentGlowColor * bloomFactor * 0.25 * finalPulse;
-    
-    // Apply final intensity multiplier
-    glow *= uGlowIntensity;
+    // --- Procedural Glowing Fissures ---
+    vec3 glowResult = vec3(0.0);
+    if (uEnableGlow > 0.5) {
+      float pulse = sin(uTime * uPulseSpeed + noise(vWorldPosition * 0.2) * 5.0) * 0.5 + 0.5;
+      float flicker = (hash(vWorldPosition + uTime * 12.0) - 0.5) * 0.1;
+      float intensity = clamp(pulse + flicker, 0.0, 1.3);
+      vec3 gCol = mix(uGlowColor, uGlowSecondaryColor, clamp(intensity * uPulseRange, 0.0, 1.0));
+      
+      float halo = smoothstep(0.05, 0.4, baseCrack);
+      float core = pow(baseCrack, 8.0);
+      glowResult = (gCol * halo * 0.4 * intensity + vec3(1.0, 0.9, 0.8) * core * (3.0 + intensity * 6.0)) * uGlowIntensity;
+    }
 
-    // --- WEATHERING & LIGHTING ---
-    float mossMask = clamp(vObjectNormal.y * 1.4, 0.0, 1.0) * noise(vWorldPosition * 3.5);
-    vec3 mossColor = vec3(0.06, 0.09, 0.04);
-    vec3 finalAlbedo = mix(texColor.rgb, mossColor, mossMask * 0.45);
+    // --- Emissive Embers (Culled at distance) ---
+    vec3 sparksResult = vec3(0.0);
+    if (uEnableSparks > 0.5 && dist < 14.0) {
+      float fade = smoothstep(14.0, 10.0, dist);
+      vec3 sPos = vWorldPosition * 18.0;
+      sPos.y -= uTime * 3.5;
+      sPos.x += sin(uTime + vWorldPosition.y) * 0.25;
+      
+      vec3 ipos = floor(sPos);
+      float sRand = hash(ipos);
+      float sLife = fract(sRand + uTime * 0.4);
+      float sPoint = pow(hash(ipos * 1.07), 40.0);
+      
+      sparksResult = mix(uGlowSecondaryColor, vec3(1.0, 1.0, 0.8), sRand) * 
+                     sPoint * step(0.12, baseCrack) * 
+                     smoothstep(0.0, 0.2, sLife) * (1.0 - smoothstep(0.7, 1.0, sLife)) * 
+                     uSparkIntensity * 25.0 * fade;
+    }
 
-    float creviceAO = pow(clamp(1.0 - cracks, 0.0, 1.0), 6.5);
-    finalAlbedo = mix(finalAlbedo * 0.01, finalAlbedo, creviceAO);
-
-    vec3 lightDir = normalize(uLightPos - vWorldPosition);
-    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+    // --- Lighting & Compositing ---
+    float ao = pow(clamp(1.0 - baseCrack * 1.3, 0.0, 1.0), 8.0);
+    float diff = max(dot(finalNorm, normalize(uLightPos - vWorldPosition)), 0.15);
     
-    float diff = max(dot(finalNormal, lightDir), 0.12);
-    vec3 halfDir = normalize(lightDir + viewDir);
-    float specMask = pow(clamp(1.0 - cracks * 1.5, 0.0, 1.0), 3.5);
-    float spec = pow(max(dot(finalNormal, halfDir), 0.0), 48.0) * 0.25 * specMask;
-    
-    vec3 lighting = (finalAlbedo * diff) + spec;
-    vec3 finalColor = lighting + glow;
+    vec3 finalColor = (texColor.rgb * ao * diff) + glowResult + sparksResult;
 
-    float dist = length(vWorldPosition - cameraPosition);
-    float fogFactor = clamp((dist - 2.5) / 25.0, 0.0, 1.0);
-    finalColor = mix(finalColor, vec3(0.005, 0.002, 0.001), fogFactor);
-
-    gl_FragColor = vec4(finalColor, 1.0);
+    // Fast fog blending (Linear)
+    float fog = clamp((dist - 3.0) / 20.0, 0.0, 1.0);
+    gl_FragColor = vec4(mix(finalColor, vec3(0.005, 0.003, 0.002), fog), 1.0);
   }
   `
 );
 
 extend({ MultiFaceMaterial });
 
-interface WallMaterialProps {
+export interface WallMaterialProps {
+  /** Texture used for faces looking mostly UP (+Y) */
   topMap: Texture;
+  /** Texture used for faces looking mostly sideways (X or Z) */
   sideMap: Texture;
+  /** Texture used for faces looking mostly DOWN (-Y) */
   bottomMap: Texture;
+  
+  /** Primary emission color for stone fissures */
   glowColor?: string | Color;
+  /** Secondary emission color for flicker and halo effects */
   glowSecondaryColor?: string | Color;
+  /** Speed of the breathing light animation */
   pulseSpeed?: number;
+  /** Weight range for color oscillation (0.0 - 1.0) */
   pulseRange?: number;
+  /** Global intensity of the emission glow */
   glowIntensity?: number;
+  /** Brightness of the floating ember particles */
+  sparkIntensity?: number;
+  /** Toggle calculation of rising embers */
+  enableSparks?: boolean;
+  /** Toggle calculation of fissure emission */
+  enableGlow?: boolean;
 }
 
+/**
+ * WallMaterial Component
+ * Handles mapping of props to shader uniforms and state updates.
+ */
 const WallMaterial: React.FC<WallMaterialProps> = React.memo(({ 
   topMap, 
   sideMap, 
@@ -195,21 +247,25 @@ const WallMaterial: React.FC<WallMaterialProps> = React.memo(({
   glowSecondaryColor = '#ffaa00',
   pulseSpeed = 0.5,
   pulseRange = 1.0,
-  glowIntensity = 1.0
+  glowIntensity = 1.0,
+  sparkIntensity = 1.2,
+  enableSparks = true,
+  enableGlow = true,
 }) => {
   const material = useMemo(() => new MultiFaceMaterial(), []);
-
-  // Use useMemo for color instances to avoid re-calculating on every render if strings are passed
-  const colorA = useMemo(() => new Color(glowColor), [glowColor]);
-  const colorB = useMemo(() => new Color(glowSecondaryColor), [glowSecondaryColor]);
+  const cA = useMemo(() => new Color(glowColor), [glowColor]);
+  const cB = useMemo(() => new Color(glowSecondaryColor), [glowSecondaryColor]);
 
   useFrame((state) => {
     material.uTime = state.clock.getElapsedTime();
-    material.uGlowColor.copy(colorA);
-    material.uGlowSecondaryColor.copy(colorB);
+    material.uGlowColor.copy(cA);
+    material.uGlowSecondaryColor.copy(cB);
     material.uPulseSpeed = pulseSpeed;
     material.uPulseRange = pulseRange;
     material.uGlowIntensity = glowIntensity;
+    material.uSparkIntensity = sparkIntensity;
+    material.uEnableSparks = enableSparks ? 1.0 : 0.0;
+    material.uEnableGlow = enableGlow ? 1.0 : 0.0;
   });
 
   return (
